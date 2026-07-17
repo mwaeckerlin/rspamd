@@ -1,0 +1,26 @@
+# Standalone smoke test — spin rspamd up on its own, no mailservice
+# stack around it. Not for production use; see mwaeckerlin/mailservice
+# for the intended context.
+
+services:
+  redis:
+    image: mwaeckerlin/redis
+    # or: image: redis:alpine
+
+  rspamd:
+    image: mwaeckerlin/rspamd
+    build: .
+    environment:
+      DOMAINS:    "example.com"
+      DKIM_DMARC: "log"
+      REDIS_HOST: "redis"
+    ports:
+      - "11332:11332"   # milter — connect from a local postfix
+      - "11334:11334"   # web UI + rspamc HTTP endpoint
+    volumes:
+      - dkim-keys:/var/lib/rspamd
+    depends_on:
+      - redis
+
+volumes:
+  dkim-keys:

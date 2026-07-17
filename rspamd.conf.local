@@ -1,0 +1,19 @@
+# Local rspamd overrides applied by init.cpp at start-up. The main
+# `/etc/rspamd/rspamd.conf` distributed with the package includes this file
+# via `.include(try = true)`. Directives here take precedence over any
+# module default.
+
+# Log to container stdout so `docker compose logs rspamd` shows every
+# decision — no syslog daemon in this scratch runtime image. The level
+# comes from local.d/logging.inc (RSPAMD_LOG_LEVEL env, default
+# notice) — do not set it here, this file wins over local.d.
+logging {
+    type = "console";
+}
+
+# The rspamd package ships /etc/rspamd/rspamd.conf which pulls in
+# per-worker configs from /etc/rspamd/worker-{proxy,controller,
+# normal,fuzzy}.inc. We add per-worker overrides in
+# /etc/rspamd/local.d/worker-*.inc — those merge into the package
+# defaults instead of creating a second listener (which would fight
+# the built-in one for the same port).
