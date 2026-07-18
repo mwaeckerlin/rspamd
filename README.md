@@ -37,6 +37,26 @@ port 11332.
 | `NOTIFY_SMTP`           | `127.0.0.1:25`   | SMTP host:port used to deliver the `NOTIFY_EMAIL` message. Must be a numeric IPv4 — no DNS lookup in the init helper.                                                                                                                            |
 | `HOSTNAME`              | `mail.local`     | Used as `From:` domain in the DKIM-key notification mail.                                                                                                                                                                                        |
 
+## Limits and delivery
+
+Rspamd **never rejects a mail because of its size**. The only knob that
+turns into an SMTP reject is the spam score crossing `RSPAMD_REJECT_SCORE`
+(default 15, deliberately conservative). Size only affects how deeply a
+message is inspected, and always fail-open:
+
+- Rspamd's content rules (Bayes, regexps) inspect the message body up to
+  Rspamd's `max_message` (upstream default ~50 MB). A larger mail is
+  still delivered; only the tail beyond that size is not fed to the
+  content rules. This never causes a reject.
+- Virus scanning is bounded by the sibling **clamav** container's
+  `CLAMD_MAX_FILESIZE` / `CLAMD_MAX_SCANSIZE` / `CLAMD_STREAM_MAXLENGTH`
+  (all default 1 GiB, configurable). A mail exceeding those is delivered
+  unscanned (`CLAM_VIRUS_FAIL`, weight 0), never bounced.
+
+So no message size limit in this stack can bounce a legitimate mail;
+the accepted size is bounded only by `postfix`'s `MESSAGE_SIZE_LIMIT`
+(default 1 GiB, configurable, `0` = unlimited).
+
 ## DKIM key generation and DNS-record notification
 
 On first start, `init` calls `rspamadm dkim_keygen -s <selector>
