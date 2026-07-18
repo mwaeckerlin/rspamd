@@ -37,12 +37,32 @@ port 11332.
 | `NOTIFY_SMTP`           | `127.0.0.1:25`   | SMTP host:port used to deliver the `NOTIFY_EMAIL` message. Must be a numeric IPv4 — no DNS lookup in the init helper.                                                                                                                            |
 | `HOSTNAME`              | `mail.local`     | Used as `From:` domain in the DKIM-key notification mail.                                                                                                                                                                                        |
 
+## Scores and thresholds
+
+The action thresholds are Rspamd's own upstream defaults — the de-facto
+convention for a mail gateway — and are kept unchanged:
+
+| Action        | Score | Env                      | Meaning                                              |
+|---------------|-------|--------------------------|------------------------------------------------------|
+| no action     | < 5   | —                        | clean mail, delivered untouched                      |
+| greylist      | 5     | `RSPAMD_GREYLIST_SCORE`  | soft 4xx defer (own users exempt)                    |
+| add header    | 6     | `RSPAMD_ADDHEADER_SCORE` | `X-Spam-Flag: YES` etc., still delivered             |
+| **reject**    | 15    | `RSPAMD_REJECT_SCORE`    | `550` at SMTP time — the only score that bounces mail |
+
+`RSPAMD_REJECT_SCORE=15` is deliberately conservative: the tail of false
+positives sits at scores ~10–14, where legitimate mail with wonky
+signals lands, so 15 avoids bouncing it («lieber zu hoch als legitime
+Mail bouncen»). Lowering it catches more spam at the cost of more
+false-positive rejects; raising it does the opposite. Bayes learning
+(via IMAPSieve) sharpens the scores over time so the threshold rarely
+needs tuning.
+
 ## Limits and delivery
 
 Rspamd **never rejects a mail because of its size**. The only knob that
 turns into an SMTP reject is the spam score crossing `RSPAMD_REJECT_SCORE`
-(default 15, deliberately conservative). Size only affects how deeply a
-message is inspected, and always fail-open:
+(see above). Size only affects how deeply a message is inspected, and
+always fail-open:
 
 - Rspamd's content rules (Bayes, regexps) inspect the message body up to
   Rspamd's `max_message` (upstream default ~50 MB). A larger mail is
