@@ -15,8 +15,12 @@ services:
       DKIM_DMARC: "log"
       REDIS_HOST: "redis"
     ports:
-      - "11332:11332"   # milter — connect from a local postfix
-      - "11334:11334"   # web UI + rspamc HTTP endpoint
+      # loopback only: the controller trusts private source IPs without
+      # a password (secure_ip), and Docker's userland proxy rewrites
+      # every external client to such an address — never expose these
+      # beyond the machine running the smoke test
+      - "127.0.0.1:11332:11332"   # milter — connect from a local postfix
+      - "127.0.0.1:11334:11334"   # web UI + rspamc HTTP endpoint
     volumes:
       - dkim-keys:/var/lib/rspamd
     depends_on:

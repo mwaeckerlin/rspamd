@@ -70,12 +70,13 @@ always fail-open:
   content rules. This never causes a reject.
 - Virus scanning is bounded by the sibling **clamav** container's
   `CLAMD_MAX_FILESIZE` / `CLAMD_MAX_SCANSIZE` / `CLAMD_STREAM_MAXLENGTH`
-  (all default 1 GiB, configurable). A mail exceeding those is delivered
-  unscanned (`CLAM_VIRUS_FAIL`, weight 0), never bounced.
+  (defaults 2 GiB / 4 GiB / 4 GiB — clamav's architectural maxima). A
+  mail exceeding those is delivered unscanned (`CLAM_VIRUS_FAIL`,
+  weight 0), never bounced.
 
 So no message size limit in this stack can bounce a legitimate mail;
 the accepted size is bounded only by `postfix`'s `MESSAGE_SIZE_LIMIT`
-(default 1 GiB, configurable, `0` = unlimited).
+(default 100 GiB, configurable, `0` = unlimited).
 
 ## DKIM key generation and DNS-record notification
 

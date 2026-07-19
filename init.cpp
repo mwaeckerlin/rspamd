@@ -15,10 +15,10 @@ Behaviour:
      the resulting BIND-style DNS TXT record to stdout (`docker compose
      logs rspamd` picks it up).
   2. If NOTIFY_EMAIL is set AND at least one new key was generated:
-     open a TCP connection to NOTIFY_SMTP (default `postfix:25`) and
-     speak plain SMTP directly — no external client, no shell, no
-     msmtp binary. On any error, log a warning and continue;
-     notification never blocks start-up.
+     open a TCP connection to NOTIFY_SMTP (default `127.0.0.1:25`,
+     numeric IPv4 — no DNS lookup) and speak plain SMTP directly — no
+     external client, no shell, no msmtp binary. On any error, log a
+     warning and continue; notification never blocks start-up.
   3. Rebuild `${LOCAL_LIB}/dkim/signing_table` and `key_table` (one
      line per domain) so rspamd's dkim_signing module picks up the
      current DOMAINS list.
@@ -43,6 +43,7 @@ and the controller at 127.0.0.1:11334. Both must be reachable.
 
 */
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <cerrno>
 #include <cstdlib>
@@ -84,6 +85,63 @@ split_ws(const std::string &s) {
   std::string tok;
   while (is >> tok) out.push_back(tok);
   return out;
+}
+
+// Every env value is substituted into the UCL config templates (or, for
+// NOTIFY_*, spoken verbatim in an SMTP dialogue), so an unvalidated
+// value — a newline or quote above all — would inject arbitrary extra
+// directives (config injection). Operator input is input:
+// whitelist-validate each value class and refuse to start on anything
+// malformed (pinned by tests/config-validation.sh).
+[[noreturn]] void
+die_invalid(const char *var, const std::string &value) {
+  std::cerr << "**** ERROR: invalid " << var << " \"" << value
+            << "\" — refusing to start" << std::endl;
+  std::exit(1);
+}
+
+// Empty stays allowed: every knob is optional — validation constrains
+// only what IS set.
+void
+check_chars(const char *var, const std::string &v, const std::string &extra) {
+  for (char c : v)
+    if (!std::isalnum(static_cast<unsigned char>(c)) &&
+        extra.find(c) == std::string::npos)
+      die_invalid(var, v);
+}
+
+void
+check_num(const char *var, const std::string &v, long min, long max) {
+  if (v.empty() || v.size() > 9 ||
+      v.find_first_not_of("0123456789") != std::string::npos)
+    die_invalid(var, v);
+  long n = std::atol(v.c_str());
+  if (n < min || n > max) die_invalid(var, v);
+}
+
+// rspamd durations: plain seconds or digits with a single s/m/h/d/w
+// suffix ("300s", "35d", "1h").
+void
+check_duration(const char *var, const std::string &v) {
+  auto suffix = v.find_first_not_of("0123456789");
+  if (v.empty() || suffix == 0) die_invalid(var, v);
+  if (suffix == std::string::npos) return;
+  if (suffix != v.size() - 1 ||
+      std::string("smhdw").find(v[suffix]) == std::string::npos)
+    die_invalid(var, v);
+}
+
+// scores: digits with an optional decimal point ("15", "5.5").
+void
+check_score(const char *var, const std::string &v) {
+  if (v.empty() || v.find_first_not_of("0123456789.") != std::string::npos ||
+      std::count(v.begin(), v.end(), '.') > 1)
+    die_invalid(var, v);
+}
+
+void
+check_bool(const char *var, const std::string &v) {
+  if (v != "true" && v != "false") die_invalid(var, v);
 }
 
 std::string
@@ -464,17 +522,47 @@ healthcheck() {
 } // namespace
 
 int main(int argc, char *argv[]) try {
-  if (argc > 1 && std::string(argv[1]) == "--healthcheck") return healthcheck();
-
   const std::string domains_env = env_or("DOMAINS", env_or("DOMAIN"));
   const std::vector<std::string> domains = split_ws(domains_env);
+  const std::string selector = env_or("SELECTOR", "mail");
+  const std::string mode     = env_or("DKIM_DMARC", "reject");
+
+  // Validate every env value before it is rendered anywhere — also on
+  // the --healthcheck path, so a misconfigured container reports
+  // unhealthy instead of probing workers that never came up. Values
+  // land in UCL templates (quotes/newlines would break out of the
+  // string) or in file paths (domains, selector: no '/').
+  for (const auto &d : domains) check_chars("DOMAINS", d, ".-");
+  check_chars("SELECTOR",   selector,               "._-");
+  check_chars("REDIS_HOST",  env_or("REDIS_HOST",  "redis"),  ".-_");
+  check_chars("CLAMAV_HOST", env_or("CLAMAV_HOST", "clamav"), ".-_");
+  check_num("REDIS_PORT",  env_or("REDIS_PORT",  "6379"), 1, 65535);
+  check_num("CLAMAV_PORT", env_or("CLAMAV_PORT", "3310"), 1, 65535);
+  check_score("RSPAMD_GREYLIST_SCORE",  env_or("RSPAMD_GREYLIST_SCORE",  "5"));
+  check_score("RSPAMD_ADDHEADER_SCORE", env_or("RSPAMD_ADDHEADER_SCORE", "6"));
+  check_score("RSPAMD_REJECT_SCORE",    env_or("RSPAMD_REJECT_SCORE",   "15"));
+  check_duration("RSPAMD_GREYLIST_TIMEOUT",
+                 env_or("RSPAMD_GREYLIST_TIMEOUT", "300s"));
+  check_duration("RSPAMD_GREYLIST_EXPIRE",
+                 env_or("RSPAMD_GREYLIST_EXPIRE", "35d"));
+  check_bool("RSPAMD_BAYES_PER_USER", env_or("RSPAMD_BAYES_PER_USER", "false"));
+  check_bool("RSPAMD_CHECK_LOCAL",    env_or("RSPAMD_CHECK_LOCAL",    "false"));
+  check_chars("RSPAMD_LOG_LEVEL", env_or("RSPAMD_LOG_LEVEL", "notice"), "");
+  check_chars("RSPAMD_LOCAL_ADDRS",
+              env_or("RSPAMD_LOCAL_ADDRS", "127.0.0.0/8"), " ./:,!");
+  check_chars("RSPAMD_SIGN_NETWORKS",
+              env_or("RSPAMD_SIGN_NETWORKS", "127.0.0.0/8"), " ./:,!");
+  check_chars("NOTIFY_EMAIL", env_or("NOTIFY_EMAIL"), "@._+-");
+  check_chars("NOTIFY_SMTP",  env_or("NOTIFY_SMTP", "127.0.0.1:25"), ".:-_");
+  check_chars("HOSTNAME",     env_or("HOSTNAME", "mail.local"), ".-");
+
+  if (argc > 1 && std::string(argv[1]) == "--healthcheck") return healthcheck();
+
   if (domains.empty()) {
     std::cerr << "#### ERROR: set DOMAINS (space-separated) or DOMAIN "
                  "(single) so rspamd can sign outgoing mail" << std::endl;
     return 1;
   }
-  const std::string selector = env_or("SELECTOR", "mail");
-  const std::string mode     = env_or("DKIM_DMARC", "reject");
 
   // 1. Generate any missing DKIM keys; collect the notifications.
   std::vector<std::pair<std::string, std::string>> new_keys;

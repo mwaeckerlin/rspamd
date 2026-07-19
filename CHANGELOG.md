@@ -1,5 +1,22 @@
 # Changelog
 
+- 2026-07-18 **1.0.1**
+    - Every configuration value from the environment is now validated
+      before use; a malformed value (an embedded quote or newline that
+      could smuggle extra configuration directives, an out-of-range
+      port, a path-traversing domain or selector, a CRLF in the
+      notification address) refuses to start with a clear
+      `invalid <VAR>` error. Covered by the new config-validation test
+      suite (`npm test`).
+    - The standalone smoke compose now binds the milter and controller
+      ports to loopback only — the controller trusts private source
+      addresses without a password, and Docker's port forwarding makes
+      every external client appear with such an address.
+    - The missing image-contract test script shipped with the package
+      scripts is now included, so `npm test` really runs.
+    - Documentation: corrected the stale size-limit figures (ClamAV
+      scan bounds, postfix message size default).
+
 - 2026-07-17 **1.0.0**
     - Initial release: headless, shell-free Rspamd container
         - runtime contains only the Rspamd daemon, its libraries and configuration — no shell, no busybox, no perl, no package manager
