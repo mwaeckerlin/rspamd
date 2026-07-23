@@ -12,6 +12,10 @@ RUN mkdir -p /etc/rspamd /etc/rspamd/local.d /etc/rspamd.d.template \
     && chmod 1777 /tmp \
     && chown -R rspamd:rspamd /etc/rspamd /var/lib/rspamd /run/rspamd
 COPY rspamd.conf.local          /etc/rspamd/rspamd.conf.local
+# Auto-included by the packaged rspamd.conf (`.include(try=true)
+# "$CONFDIR/rspamd.local.lua"`): stamps the X-Transport-Security header
+# from the SMTP session's TLS macros handed over by postfix.
+COPY transport_security.lua     /etc/rspamd/rspamd.local.lua
 # Static worker overrides — no ${VAR} substitution needed, so they
 # ship straight into /etc/rspamd/local.d/ instead of the template dir.
 COPY worker-proxy.inc           /etc/rspamd/local.d/worker-proxy.inc
@@ -52,6 +56,7 @@ ENV CONTAINERNAME="rspamd" \
     DOMAIN="" \
     DOMAINS="" \
     SELECTOR="mail" \
+    AUTHSERV_ID="" \
     DKIM_DMARC="reject" \
     NOTIFY_EMAIL="" \
     NOTIFY_SMTP="127.0.0.1:25" \

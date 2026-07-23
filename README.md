@@ -57,6 +57,15 @@ false-positive rejects; raising it does the opposite. Bayes learning
 (via IMAPSieve) sharpens the scores over time so the threshold rarely
 needs tuning.
 
+The verdict headers are authoritative: rspamd's milter_headers module
+removes any incoming `X-Spam-Flag` / `X-Spam-Status` on every scan
+(and `X-Spam-Level` from score ≥ 1) before this container's own
+verdict is stamped, and the `SPAM_FLAG` rule additionally scores a
+pre-existing flag as a spam signal — a sender-supplied flag can
+therefore not route legitimate mail to Junk on a downstream that files
+by these headers. Pinned by the mailservice e2e suite. The
+`X-Transport-Security` header enjoys the same protection (see below).
+
 ## Limits and delivery
 
 Rspamd **never rejects a mail because of its size**. The only knob that

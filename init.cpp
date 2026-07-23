@@ -410,6 +410,13 @@ mode_variables(const std::string &mode) {
   v["RSPAMD_GREYLIST_EXPIRE"]  = env_or("RSPAMD_GREYLIST_EXPIRE",  "35d");
   v["RSPAMD_CHECK_LOCAL"]      = env_or("RSPAMD_CHECK_LOCAL",      "false");
   v["RSPAMD_LOG_LEVEL"]        = env_or("RSPAMD_LOG_LEVEL",        "notice");
+  // AUTHSERV_ID → the authserv-id in Authentication-Results. Empty
+  // leaves the routine without the key so rspamd uses the local FQDN.
+  {
+    const std::string id = env_or("AUTHSERV_ID");
+    v["RSPAMD_AUTHSERV_ID_LINE"] =
+        id.empty() ? "" : "authserv_id = \"" + id + "\";";
+  }
   // Which client networks count as "own" (skip external checks): the
   // production default treats RFC1918 as internal; the e2e stack
   // narrows this to loopback so the test-runner's mail is verified.
@@ -555,6 +562,7 @@ int main(int argc, char *argv[]) try {
   check_chars("NOTIFY_EMAIL", env_or("NOTIFY_EMAIL"), "@._+-");
   check_chars("NOTIFY_SMTP",  env_or("NOTIFY_SMTP", "127.0.0.1:25"), ".:-_");
   check_chars("HOSTNAME",     env_or("HOSTNAME", "mail.local"), ".-");
+  check_chars("AUTHSERV_ID",  env_or("AUTHSERV_ID"), ".-");
 
   if (argc > 1 && std::string(argv[1]) == "--healthcheck") return healthcheck();
 

@@ -1,5 +1,24 @@
 # Changelog
 
+- 2026-07-20 **1.1.1**
+    - Documentation: sender-forged verdict headers (`X-Spam-Flag`,
+      `X-Spam-Status`, `X-Spam-Level`) cannot divert legitimate mail —
+      rspamd removes incoming copies before stamping its own verdict and
+      additionally scores a pre-existing spam flag as a spam signal.
+      This upstream guarantee is now documented here and pinned by the
+      mailservice end-to-end suite.
+
+- 2026-07-20 **1.1.0**
+    - Stamps a machine-readable `X-Transport-Security` header on every
+      incoming mail (`TLSv1.3 (cipher …)` or `none`), derived from the
+      SMTP session's TLS version/cipher that postfix hands over as
+      milter macros — the trustworthy last-hop transport measurement the
+      webmail marks. A new header never breaks a DKIM signature.
+    - `AUTHSERV_ID` is now wired into the Authentication-Results
+      authserv-id (empty → the local FQDN, as before). The dead
+      `NAMESERVERS` knob (OpenDKIM-era, consumed by nothing) is dropped
+      from the stack composes.
+
 - 2026-07-18 **1.0.1**
     - Every configuration value from the environment is now validated
       before use; a malformed value (an embedded quote or newline that

@@ -1,6 +1,6 @@
 {
   "name": "@mwaeckerlin/rspamd",
-  "version": "1.0.1",
+  "version": "1.1.1",
   "scripts": {
     "build": "docker compose build",
     "start": "docker compose up --build --force-recreate --remove-orphans",
