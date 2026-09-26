@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-09-26 **3.5.1**
+    - The image is published for amd64 and arm64 under one tag, built and published automatically on every change and every week
+
 - 2026-07-20 **1.1.1**
     - Documentation: sender-forged verdict headers (`X-Spam-Flag`,
       `X-Spam-Status`, `X-Spam-Level`) cannot divert legitimate mail —
