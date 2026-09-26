@@ -5,7 +5,9 @@
     "build": "docker compose build",
     "start": "docker compose up --build --force-recreate --remove-orphans",
     "start:daemon": "docker compose up -d --build --force-recreate --remove-orphans",
+    "start:dev": "docker compose up --build --force-recreate --remove-orphans",
     "stop": "docker compose down",
+    "deploy": "docker compose push rspamd",
     "test": "npm run test:image && npm run test:config",
     "test:image": "npm run build && bash tests/image-contract.sh mwaeckerlin/rspamd",
     "test:config": "bash tests/config-validation.sh mwaeckerlin/rspamd"
