@@ -144,6 +144,51 @@ check_bool(const char *var, const std::string &v) {
   if (v != "true" && v != "false") die_invalid(var, v);
 }
 
+// UCL sizes: digits, optionally k/m/g, optionally b ("50Mb", "52428800").
+void
+check_ucl_size(const char *var, const std::string &v) {
+  const auto suffix = v.find_first_not_of("0123456789");
+  if (v.empty() || suffix == 0) die_invalid(var, v);
+  if (suffix == std::string::npos) return;
+  const std::string s = v.substr(suffix);
+  static const char *const allowed[] = {"k", "m", "g", "K", "M", "G",
+                                        "kb", "mb", "gb", "Kb", "Mb", "Gb",
+                                        "KB", "MB", "GB"};
+  for (const char *a : allowed)
+    if (s == a) return;
+  die_invalid(var, v);
+}
+
+// A secret lands in a quoted UCL string and is never echoed to the log.
+void
+check_secret(const char *var, const std::string &v) {
+  for (char c : v)
+    if (c == '"' || c == '\\' || static_cast<unsigned char>(c) < 0x20) {
+      std::cerr << "**** ERROR: invalid " << var
+                << " (value withheld) — refusing to start" << std::endl;
+      std::exit(1);
+    }
+}
+
+// "a, b c" → "\"a\", \"b\", \"c\"": the comma/space-separated env as a
+// UCL list body.
+std::string
+ucl_list(const std::string &csv) {
+  std::string list;
+  std::string item;
+  std::istringstream in(csv);
+  while (std::getline(in, item, ',')) {
+    for (const auto &tok : split_ws(item)) {
+      if (!list.empty()) list += ", ";
+      list += "\"" + tok + "\"";
+    }
+  }
+  return list;
+}
+
+constexpr const char *DEFAULT_SECURE_IP =
+    "127.0.0.0/8, ::1, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16";
+
 std::string
 read_file(const fs::path &p) {
   std::ifstream in(p, std::ios::binary);
@@ -427,19 +472,18 @@ mode_variables(const std::string &mode) {
   // of sign_local / sign_authenticated). dkim_signing expects a UCL
   // list — a bare CIDR string would be parsed as a map URL — so the
   // comma/space-separated env is rewritten to `"cidr", "cidr"` here.
+  v["RSPAMD_SIGN_NETWORKS"] =
+      ucl_list(env_or("RSPAMD_SIGN_NETWORKS", "127.0.0.0/8"));
+  v["RSPAMD_CONTROLLER_SECURE_IP"] =
+      ucl_list(env_or("RSPAMD_CONTROLLER_SECURE_IP", DEFAULT_SECURE_IP));
   {
-    std::string list;
-    std::string item;
-    std::istringstream in(env_or("RSPAMD_SIGN_NETWORKS", "127.0.0.0/8"));
-    while (std::getline(in, item, ',')) {
-      const auto begin = item.find_first_not_of(" \t");
-      if (begin == std::string::npos) continue;
-      const auto end = item.find_last_not_of(" \t");
-      if (!list.empty()) list += ", ";
-      list += "\"" + item.substr(begin, end - begin + 1) + "\"";
-    }
-    v["RSPAMD_SIGN_NETWORKS"] = list;
+    const std::string pw = env_or("RSPAMD_CONTROLLER_PASSWORD");
+    v["RSPAMD_CONTROLLER_PASSWORD_LINE"] =
+        pw.empty() ? "" : "password = \"" + pw + "\";";
   }
+  v["RSPAMD_PROXY_WORKERS"]    = env_or("RSPAMD_PROXY_WORKERS",    "4");
+  v["RSPAMD_BAYES_MIN_LEARNS"] = env_or("RSPAMD_BAYES_MIN_LEARNS", "200");
+  v["RSPAMD_MAX_MESSAGE"]      = env_or("RSPAMD_MAX_MESSAGE",      "50Mb");
 
   // Force-action rules shared by permissive and reject: a broken or
   // unknown-key DKIM signature is always a hard bounce (v2 contract:
@@ -559,6 +603,12 @@ int main(int argc, char *argv[]) try {
               env_or("RSPAMD_LOCAL_ADDRS", "127.0.0.0/8"), " ./:,!");
   check_chars("RSPAMD_SIGN_NETWORKS",
               env_or("RSPAMD_SIGN_NETWORKS", "127.0.0.0/8"), " ./:,!");
+  check_chars("RSPAMD_CONTROLLER_SECURE_IP",
+              env_or("RSPAMD_CONTROLLER_SECURE_IP", DEFAULT_SECURE_IP), " ./:,!");
+  check_secret("RSPAMD_CONTROLLER_PASSWORD", env_or("RSPAMD_CONTROLLER_PASSWORD"));
+  check_num("RSPAMD_PROXY_WORKERS",    env_or("RSPAMD_PROXY_WORKERS",    "4"), 1, 1024);
+  check_num("RSPAMD_BAYES_MIN_LEARNS", env_or("RSPAMD_BAYES_MIN_LEARNS", "200"), 1, 100000000);
+  check_ucl_size("RSPAMD_MAX_MESSAGE", env_or("RSPAMD_MAX_MESSAGE", "50Mb"));
   check_chars("NOTIFY_EMAIL", env_or("NOTIFY_EMAIL"), "@._+-");
   check_chars("NOTIFY_SMTP",  env_or("NOTIFY_SMTP", "127.0.0.1:25"), ".:-_");
   check_chars("HOSTNAME",     env_or("HOSTNAME", "mail.local"), ".-");

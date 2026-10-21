@@ -83,6 +83,12 @@ _reject log_level_injection   RSPAMD_LOG_LEVEL      'info"; systemd = true; x = 
 _reject bayes_bad             RSPAMD_BAYES_PER_USER "maybe"
 _reject notify_email_crlf     NOTIFY_EMAIL          $'a@b.c\r\nRCPT TO:<x@y.z>'
 _reject notify_smtp_bad       NOTIFY_SMTP           "1.2.3.4:25 extra"
+_reject secure_ip_quote       RSPAMD_CONTROLLER_SECURE_IP '127.0.0.0/8", "0.0.0.0/0'
+_reject password_quote        RSPAMD_CONTROLLER_PASSWORD  'pw"; secure_ip = "0.0.0.0/0'
+_reject password_newline      RSPAMD_CONTROLLER_PASSWORD  $'pw\nsecure_ip = "0.0.0.0/0";'
+_reject proxy_workers_zero    RSPAMD_PROXY_WORKERS  "0"
+_reject min_learns_bad        RSPAMD_BAYES_MIN_LEARNS "200; autolearn = true"
+_reject max_message_bad       RSPAMD_MAX_MESSAGE    "50 megabytes"
 
 _accept defaults
 _accept explicit_values \
@@ -100,6 +106,11 @@ _accept explicit_values \
     -e RSPAMD_LOG_LEVEL=info \
     -e RSPAMD_LOCAL_ADDRS='192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8, 127.0.0.0/8, ::1' \
     -e RSPAMD_SIGN_NETWORKS='10.0.0.0/8, 127.0.0.0/8' \
+    -e RSPAMD_CONTROLLER_SECURE_IP='127.0.0.0/8, ::1, 10.0.0.0/8' \
+    -e RSPAMD_CONTROLLER_PASSWORD='$2$abc.def/ghi' \
+    -e RSPAMD_PROXY_WORKERS=8 \
+    -e RSPAMD_BAYES_MIN_LEARNS=50 \
+    -e RSPAMD_MAX_MESSAGE=100Mb \
     -e NOTIFY_EMAIL=hostmaster@example.com \
     -e NOTIFY_SMTP=10.0.0.5:25
 

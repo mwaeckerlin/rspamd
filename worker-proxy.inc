@@ -8,6 +8,6 @@ upstream "local" {
     default = yes;
     self_scan = yes;
 }
-count = 4;
+count = ${RSPAMD_PROXY_WORKERS};
 max_retries = 5;
 reject_message = "message rejected by policy";

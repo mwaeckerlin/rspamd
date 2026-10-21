@@ -9,3 +9,7 @@
 # loopback so the test-runner (necessarily on a 10.x docker network)
 # is treated as an external sender and the verify paths actually run.
 local_addrs = "${RSPAMD_LOCAL_ADDRS}";
+
+# Largest message the content rules inspect; a larger one is still
+# delivered, only its tail is not scanned.
+max_message = ${RSPAMD_MAX_MESSAGE};

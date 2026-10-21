@@ -16,10 +16,8 @@ COPY rspamd.conf.local          /etc/rspamd/rspamd.conf.local
 # "$CONFDIR/rspamd.local.lua"`): stamps the X-Transport-Security header
 # from the SMTP session's TLS macros handed over by postfix.
 COPY transport_security.lua     /etc/rspamd/rspamd.local.lua
-# Static worker overrides — no ${VAR} substitution needed, so they
-# ship straight into /etc/rspamd/local.d/ instead of the template dir.
-COPY worker-proxy.inc           /etc/rspamd/local.d/worker-proxy.inc
-COPY worker-controller.inc      /etc/rspamd/local.d/worker-controller.inc
+COPY worker-proxy.inc           /etc/rspamd.d.template/worker-proxy.inc
+COPY worker-controller.inc      /etc/rspamd.d.template/worker-controller.inc
 COPY actions.conf               /etc/rspamd.d.template/actions.conf
 COPY dkim.conf                  /etc/rspamd.d.template/dkim.conf
 COPY dkim_signing.conf          /etc/rspamd.d.template/dkim_signing.conf
@@ -64,6 +62,13 @@ ENV CONTAINERNAME="rspamd" \
     REDIS_PORT="6379" \
     CLAMAV_HOST="clamav" \
     CLAMAV_PORT="3310"
+# Controller (web UI, rspamc): networks with password-free privileged
+# access, and an optional password for everyone else.
+ENV RSPAMD_CONTROLLER_SECURE_IP="127.0.0.0/8, ::1, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16" \
+    RSPAMD_CONTROLLER_PASSWORD=""
+ENV RSPAMD_PROXY_WORKERS="4" \
+    RSPAMD_BAYES_MIN_LEARNS="200" \
+    RSPAMD_MAX_MESSAGE="50Mb"
 EXPOSE 11332 11334
 VOLUME /var/lib/rspamd
 USER rspamd
