@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-23 **3.5.3**
+    - The version line 3 is published as `mwaeckerlin/rspamd:3` from the branch `3`, on every push to it and every week from the run on master, so it gets the security fixes of its base image; its test checks the image
+
 - 2026-10-22 **3.5.2**
     - `RSPAMD_CONTROLLER_SECURE_IP` (default loopback and the private networks) names the networks that use the controller without a password, and `RSPAMD_CONTROLLER_PASSWORD` (default none) protects the web UI and `rspamc` for everyone else
     - `RSPAMD_PROXY_WORKERS` (default `4`) sets the number of milter workers, `RSPAMD_BAYES_MIN_LEARNS` (default `200`) the number of trained mails per class before Bayes counts, and `RSPAMD_MAX_MESSAGE` (default `50Mb`, rspamd's own) the largest message the content rules inspect
